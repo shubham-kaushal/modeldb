@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 
+from .._internal_utils._utils import NoneProtoResponse
 from .._tracking.entity import _ModelDBEntity
 
 from .._protos.public.registry import RegistryService_pb2 as _ModelVersionService
@@ -178,6 +179,36 @@ class RegisteredModelVersion(_ModelDBEntity):
     def del_environment(self):
         raise NotImplementedError
 
+    def add_label(self, label):
+        if label is None:
+            raise ValueError("label is not specified")
+        self._clear_cache()
+        self._refresh_cache()
+        if label not in self._msg.labels:
+            self._msg.labels.append(label)
+            self._update()
+
+    def del_label(self, label):
+        if label is None:
+            raise ValueError("label is not specified")
+        self._clear_cache()
+        self._refresh_cache()
+        if label in self._msg.labels:
+            self._msg.labels.remove(label)
+            self._update()
+
+    def get_labels(self):
+        self._clear_cache()
+        self._refresh_cache()
+        return self._msg.labels
+
+    def _update(self):
+        response = self._conn.make_proto_request("PUT", "/api/v1/registry/{}/versions/{}".format(self._msg.registered_model_id, self.id),
+                                                 body=self._msg)
+        Message = _ModelVersionService.SetModelVersion
+        if isinstance(self._conn.maybe_proto_response(response, Message.Response), NoneProtoResponse):
+            raise ValueError("Model not found")
+
     def _get_url_for_artifact(self, key, method, artifact_type, part_num=0):
         if method.upper() not in ("GET", "PUT"):
             raise ValueError("`method` must be one of {'GET', 'PUT'}")
@@ -328,4 +359,3 @@ class RegisteredModelVersion(_ModelDBEntity):
         _utils.raise_for_http_error(response)
 
         return response.content
-
